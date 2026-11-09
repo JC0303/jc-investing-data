@@ -10,7 +10,8 @@ if "@" not in UA:
     sys.exit("SEC_UA secret missing (format: 'Name email')")
 
 REV = ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
-       "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax"]
+       "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax",
+       "RevenuesNetOfInterestExpense", "InterestAndDividendIncomeOperating"]  # last two: banks
 NI = "NetIncomeLoss"
 
 
