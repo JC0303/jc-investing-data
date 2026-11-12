@@ -1,0 +1,16 @@
+name: probe data sources
+on:
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for u in \
+            "https://mopsov.twse.com.tw/nas/t21/sii/t21sc03_113_1_0.html" \
+            "https://mopsov.twse.com.tw/nas/t21/sii/t21sc03_113_1.html" \
+            "https://mopsov.twse.com.tw/nas/t21/otc/t21sc03_113_1_0.html" \
+            "https://mops.twse.com.tw/nas/t21/sii/t21sc03_113_1_0.html" \
+            "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMonthRevenue&start_date=2024-01-01&end_date=2024-02-15" \
+            "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockMonthRevenue&data_id=2330&start_date=2020-01-01" ; do
+            echo "== $u"; curl -sS -A "Mozilla/5.0" -m 40 -o /tmp/o -w "HTTP %{http_code} size %{size_download}\n" "$u"; head -c 300 /tmp/o | iconv -f big5 -t utf-8 -c; echo; done
