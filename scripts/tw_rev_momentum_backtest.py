@@ -45,7 +45,7 @@ def fetch_month(y, m, mkt):
     last_err = None
     for host in HOSTS:
         url = f"{host}/nas/t21/{mkt}/t21sc03_{roc}_{m}_0.html"
-        for attempt in range(3):
+        for attempt in range(8):
             try:
                 r = requests.get(url, headers=HDR, timeout=60)
                 if r.status_code != 200:
@@ -79,7 +79,7 @@ def fetch_month(y, m, mkt):
                 return df.dropna(subset=["rev"]), None
             except Exception as e:  # noqa
                 last_err = f"{url} {type(e).__name__}: {e}"
-                time.sleep(3)
+                time.sleep(10 * (attempt + 1))
     return None, last_err
 
 
