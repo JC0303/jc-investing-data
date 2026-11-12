@@ -1,0 +1,38 @@
+name: TW market data (DATA-03)
+
+on:
+  schedule:
+    - cron: "5 10 * * 1-5"   # 18:05 Taipei, weekdays
+    - cron: "35 10 12 * *"   # 18:35 Taipei on the 12th, before the 19:17 monthly task
+  push:
+    branches: [main]
+    paths: [scripts/fetch_tw.py, .github/workflows/tw.yml]   # first run happens on merge
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tw-data
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Fetch TWSE / TPEx / MOPS files
+        run: python scripts/fetch_tw.py
+      - name: Commit data
+        if: always()
+        run: |
+          git config user.name "jc-investing-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/tw
+          git diff --cached --quiet || git commit -m "TW data $(date -u +%F)"
+          git pull --rebase && git push

@@ -1,6 +1,9 @@
 name: TW short-term v2 backtest
 
 on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/tw_backtest.yml]   # run once when this trigger lands
   workflow_dispatch:
 
 permissions:
