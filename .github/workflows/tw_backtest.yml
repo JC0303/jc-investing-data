@@ -1,0 +1,29 @@
+name: TW short-term v2 backtest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install pandas numpy requests lxml html5lib yfinance
+      - name: Run backtest
+        run: python scripts/tw_rev_momentum_backtest.py
+      - name: Commit results
+        if: always()
+        run: |
+          git config user.name "jc-investing-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A results data/tw_monthly_revenue.csv || true
+          git diff --cached --quiet || git commit -m "TW v2 backtest $(date -u +%F)"
+          git pull --rebase && git push
