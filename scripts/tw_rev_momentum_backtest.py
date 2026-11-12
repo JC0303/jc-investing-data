@@ -27,8 +27,8 @@ STOP = 0.92
 MIN_VALUE = 3_000_000
 POS = 16_000
 
-HOSTS = ["https://mopsov.twse.com.tw", "https://mops.twse.com.tw"]
-HDR = {"User-Agent": "Mozilla/5.0 (research backtest; contact via repo owner)"}
+HOSTS = ["https://mopsov.twse.com.tw"]
+HDR = {"User-Agent": "Mozilla/5.0"}
 
 
 def months():
@@ -53,19 +53,17 @@ def fetch_month(y, m, mkt):
                     time.sleep(3)
                     continue
                 html = r.content.decode("big5", errors="ignore")
-                tables = pd.read_html(io.StringIO(html))
+                tables = pd.read_html(io.StringIO(html), header=None)
                 rows = []
                 for t in tables:
-                    cols = [" ".join(map(str, c)) if isinstance(c, tuple) else str(c) for c in t.columns]
-                    t.columns = cols
-                    code_c = next((c for c in cols if "公司代號" in c), None)
-                    cur_c = next((c for c in cols if "當月營收" in c), None)
-                    ly_c = next((c for c in cols if "去年當月營收" in c), None)
-                    if not (code_c and cur_c and ly_c):
+                    if t.shape[1] < 5:
                         continue
-                    sub = t[[code_c, cur_c, ly_c]].copy()
+                    sub = t.iloc[:, [0, 2, 4]].copy()
                     sub.columns = ["code", "rev", "rev_ly"]
-                    rows.append(sub)
+                    sub["code"] = sub["code"].astype(str).str.strip()
+                    sub = sub[sub["code"].str.fullmatch(r"\d{4}")]
+                    if len(sub):
+                        rows.append(sub)
                 if not rows:
                     last_err = f"{url} no table"
                     break
@@ -93,6 +91,8 @@ def load_revenue():
             if df is None:
                 errors.append(err)
                 print("FAIL", err, flush=True)
+                if not frames and len(errors) >= 2:
+                    sys.exit("First revenue pages failed; stopping early: " + "; ".join(errors))
             else:
                 frames.append(df)
                 print("ok", y, m, mkt, len(df), flush=True)
