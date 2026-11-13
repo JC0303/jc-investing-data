@@ -1,7 +1,7 @@
 source,result,checked_utc,bytes,url,error
-bwibbu_all,ok,2026-11-12 12:12 UTC,52961,https://www.twse.com.tw/exchangeReport/BWIBBU_ALL?response=open_data,
-stock_day_all,ok,2026-11-12 12:12 UTC,138511,https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data,
-tpex_pe,ok,2026-11-12 12:12 UTC,67704,https://www.tpex.org.tw/web/stock/aftertrading/peratio_analysis/pera_result.php?l=zh-tw&o=csv,
-tpex_close,ok,2026-11-12 12:12 UTC,1971837,https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=csv&d=115/11/12&s=0,asc,0,
-mops_rev_L,ok,2026-11-12 12:12 UTC,204750,https://mopsfin.twse.com.tw/opendata/t187ap05_L.csv,
-mops_rev_O,ok,2026-11-12 12:12 UTC,170614,https://mopsfin.twse.com.tw/opendata/t187ap05_O.csv,
+bwibbu_all,ok,2026-11-13 17:34 UTC,52939,https://www.twse.com.tw/exchangeReport/BWIBBU_ALL?response=open_data,
+stock_day_all,ok,2026-11-13 17:34 UTC,137780,https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data,
+tpex_pe,ok,2026-11-13 17:34 UTC,67710,https://www.tpex.org.tw/web/stock/aftertrading/peratio_analysis/pera_result.php?l=zh-tw&o=csv,
+tpex_close,ok,2026-11-13 17:34 UTC,1969383,https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=csv&d=115/11/13&s=0,asc,0,
+mops_rev_L,ok,2026-11-13 17:34 UTC,204932,https://mopsfin.twse.com.tw/opendata/t187ap05_L.csv,
+mops_rev_O,ok,2026-11-13 17:34 UTC,170614,https://mopsfin.twse.com.tw/opendata/t187ap05_O.csv,
