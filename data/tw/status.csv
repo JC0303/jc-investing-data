@@ -1,7 +1,7 @@
 source,result,checked_utc,bytes,url,error,data_date,expected,fresh,stale_kept
-bwibbu_all,ok,2026-11-17 18:59 UTC,52986,https://www.twse.com.tw/exchangeReport/BWIBBU_ALL?response=open_data,,2026-11-17,2026-11-17,yes,no
-stock_day_all,ok,2026-11-17 18:59 UTC,139102,https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data,,2026-11-17,2026-11-17,yes,no
-tpex_pe,ok,2026-11-17 18:59 UTC,67834,https://www.tpex.org.tw/web/stock/aftertrading/peratio_analysis/pera_result.php?l=zh-tw&o=csv,,2026-11-17,2026-11-17,yes,no
-tpex_close,ok,2026-11-17 18:59 UTC,1957378,"https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=csv&d=115/11/18&s=0,asc,0",,2026-11-17,2026-11-17,yes,no
-mops_rev_L,ok,2026-11-17 18:59 UTC,207911,https://mopsfin.twse.com.tw/opendata/t187ap05_L.csv,,2026-10-01,2026-10-01,yes,no
-mops_rev_O,ok,2026-11-17 18:59 UTC,170907,https://mopsfin.twse.com.tw/opendata/t187ap05_O.csv,,2026-10-01,2026-10-01,yes,no
+bwibbu_all,ok,2026-11-18 18:44 UTC,52987,https://www.twse.com.tw/exchangeReport/BWIBBU_ALL?response=open_data,,2026-11-18,2026-11-18,yes,no
+stock_day_all,ok,2026-11-18 18:44 UTC,138330,https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=open_data,,2026-11-18,2026-11-18,yes,no
+tpex_pe,ok,2026-11-18 18:44 UTC,67762,https://www.tpex.org.tw/web/stock/aftertrading/peratio_analysis/pera_result.php?l=zh-tw&o=csv,,2026-11-18,2026-11-18,yes,no
+tpex_close,ok,2026-11-18 18:44 UTC,1961300,"https://www.tpex.org.tw/web/stock/aftertrading/daily_close_quotes/stk_quote_result.php?l=zh-tw&o=csv&d=115/11/19&s=0,asc,0",,2026-11-18,2026-11-18,yes,no
+mops_rev_L,ok,2026-11-18 18:44 UTC,207911,https://mopsfin.twse.com.tw/opendata/t187ap05_L.csv,,2026-10-01,2026-10-01,yes,no
+mops_rev_O,ok,2026-11-18 18:44 UTC,170907,https://mopsfin.twse.com.tw/opendata/t187ap05_O.csv,,2026-10-01,2026-10-01,yes,no
