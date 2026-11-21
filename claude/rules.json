@@ -1,21 +1,13 @@
 {
   "_comment": "Machine-readable form of the rules JC has already approved. Derived from 01-Investor-Profile-and-Portfolio.md (2026-11-17) and decisions recorded in the JC Investing project. Programs read this; it never places an order.",
   "version": 1,
-  "updated": "2026-11-21",
+  "updated": "2026-11-22",
   "monthly_dca": {
     "ticker": "0050",
     "amount_twd": 20000,
     "day_of_month": 16,
     "dividend_reinvestment": true,
     "effective_from": "2026-11"
-  },
-  "review_line": {
-    "_comment": "An active-pool holding falling this far below its average cost triggers a review. A review is not a sell instruction and spends no money, so 15% is adopted as the working default rather than left as an open question. Say the word and it changes.",
-    "applies_to": [
-      "3036"
-    ],
-    "drop_pct": 0.15,
-    "decided": "2026-11-21 default adopted by Claude; reversible on request"
   },
   "zero_fifty_ladder": {
     "_comment": "Extra 0050 purchases on drawdown from the measured one-year high. approved_for_execution stays false: the check only reports that a step has been reached and never suggests buying. Only JC can set this true, because it is the one rule here that would spend money.",
@@ -26,11 +18,35 @@
       0.4
     ],
     "one_year_high_from": "data/tw/highs.json",
-    "_one_year_high_note": "Measured from TWSE STOCK_DAY by scripts/tw_price_history.py. The previous value, 116.5, was derived in conversation on 2026-11-19 and is no longer used: a number that decides where money is spent is looked up, not estimated."
+    "_one_year_high_note": "Measured from TWSE STOCK_DAY by scripts/tw_price_history.py. The previous value, 116.5, was derived in conversation on 2026-11-19 and is no longer used: a number that decides where money is spent is looked up, not estimated.",
+    "amount_twd_per_step": 20000,
+    "_amount_note": "Default set 2026-11-22 to one month's DCA. The check reports what this amount would buy at the step price so JC is not doing arithmetic on the day. It is a computed figure, not a recommendation, and approved_for_execution stays false."
   },
   "never": [
     "place, modify or cancel any order",
     "convert currency",
     "change any broker setting"
-  ]
+  ],
+  "relative_review": {
+    "_comment": "Replaces the old cost-anchored review line. JC's purchase price is not information about the holding, and a rule triggered by it reacts only to positions that are down, however the business is doing. This compares each holding with 0050 over the same window instead. Decided 2026-11-22 by JC. A review is a prompt to look again; it is never a sell instruction.",
+    "benchmark": "0050",
+    "lookback_trading_days": 63,
+    "lag_pct": 0.15,
+    "applies_to": [
+      "2330",
+      "009826",
+      "3036"
+    ],
+    "history_from": "data/tw/history_{ticker}.csv",
+    "unavailable": {
+      "AVGO": "這個檢查只用免費的台股資料，沒有美股價格，所以 AVGO 無法比較"
+    }
+  },
+  "positions_held_without_addition": {
+    "_comment": "2330 and AVGO are small enough that they cannot change the outcome either way. JC chose on 2026-11-22 to leave them as they are and simply give them a rule. No decision to add or reduce is implied.",
+    "tickers": [
+      "2330",
+      "AVGO"
+    ]
+  }
 }

@@ -1,28 +1,71 @@
 {
-  "generated_at": "2026-11-21T13:57:04+00:00",
+  "generated_at": "2026-11-21T18:39:38+00:00",
   "price_date": "2026-11-20",
   "feed_problem": null,
   "rule_problems": [],
-  "data_problem": false,
-  "rule_instances": 3,
-  "rule_instances_evaluated": 3,
+  "data_problem": true,
+  "rule_instances": 6,
+  "rule_instances_evaluated": 5,
   "rules_not_evaluated_here": [
     "每月定期定額（0050 每月 16 日 20000 元）：這是固定扣款，不需要每日判斷，所以這個檢查不看它",
     "禁止清單（不下單、不換匯、不改券商設定）：3 條，程式本身永遠不做這些事"
   ],
-  "rules_total": 3,
-  "rules_evaluated": 3,
+  "rules_total": 6,
+  "rules_evaluated": 5,
   "checks": [
     {
-      "rule": "review_line",
+      "rule": "relative_review",
+      "ticker": "2330",
+      "instrument": "台積電 (odd lot)",
+      "benchmark": "0050",
+      "lookback_trading_days": 63,
+      "price_date": "2026-11-20",
+      "since": "2026-08-18",
+      "until": "2026-11-20",
+      "change_pct": "-15.97",
+      "benchmark_change_pct": "-19.49",
+      "lag_pct": "3.53",
+      "limit_pct": "15.00",
+      "status": "CLEAR"
+    },
+    {
+      "rule": "relative_review",
+      "ticker": "009826",
+      "instrument": "貝萊德世界股票 ETF",
+      "benchmark": "0050",
+      "lookback_trading_days": 63,
+      "price_date": "2026-11-20",
+      "since": "2026-08-18",
+      "until": "2026-11-20",
+      "change_pct": "-5.70",
+      "benchmark_change_pct": "-19.49",
+      "lag_pct": "13.80",
+      "limit_pct": "15.00",
+      "status": "CLEAR"
+    },
+    {
+      "rule": "relative_review",
       "ticker": "3036",
       "instrument": "文曄",
+      "benchmark": "0050",
+      "lookback_trading_days": 63,
       "price_date": "2026-11-20",
-      "price": "162.50",
-      "line": "160.02",
-      "avg_cost": "188.26",
-      "gap_pct": "1.55",
-      "status": "NEAR"
+      "since": "2026-08-18",
+      "until": "2026-11-20",
+      "change_pct": "-19.55",
+      "benchmark_change_pct": "-19.49",
+      "lag_pct": "-0.06",
+      "limit_pct": "15.00",
+      "status": "CLEAR"
+    },
+    {
+      "rule": "relative_review",
+      "ticker": "AVGO",
+      "instrument": "Broadcom",
+      "benchmark": "0050",
+      "price_date": "2026-11-20",
+      "status": "NO_DATA",
+      "reason": "這個檢查只用免費的台股資料，沒有美股價格，所以 AVGO 無法比較"
     },
     {
       "rule": "zero_fifty_ladder",
@@ -33,6 +76,8 @@
       "price": "84.45",
       "level": "81.62",
       "one_year_high": "116.60",
+      "amount_twd_per_step": 20000,
+      "shares_at_level": 245,
       "high_date": "2026-10-06",
       "high_as_of": "2026-11-21",
       "high_source": "TWSE STOCK_DAY",
@@ -49,6 +94,8 @@
       "price": "84.45",
       "level": "69.96",
       "one_year_high": "116.60",
+      "amount_twd_per_step": 20000,
+      "shares_at_level": 285,
       "high_date": "2026-10-06",
       "high_as_of": "2026-11-21",
       "high_source": "TWSE STOCK_DAY",
@@ -58,20 +105,18 @@
     }
   ],
   "triggered": [],
-  "near": [
+  "near": [],
+  "no_data": [
     {
-      "rule": "review_line",
-      "ticker": "3036",
-      "instrument": "文曄",
+      "rule": "relative_review",
+      "ticker": "AVGO",
+      "instrument": "Broadcom",
+      "benchmark": "0050",
       "price_date": "2026-11-20",
-      "price": "162.50",
-      "line": "160.02",
-      "avg_cost": "188.26",
-      "gap_pct": "1.55",
-      "status": "NEAR"
+      "status": "NO_DATA",
+      "reason": "這個檢查只用免費的台股資料，沒有美股價格，所以 AVGO 無法比較"
     }
   ],
-  "no_data": [],
   "unpriced_positions": [
     {
       "ticker": "AVGO",

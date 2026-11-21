@@ -161,7 +161,7 @@ def main():
     # The field each rule's loop iterates is as load-bearing as the rule block
     # itself: an empty or missing list silently produced zero checks and a
     # smaller rules_total, with nothing saying a rule had stopped being checked.
-    for key, field in (('review_line', 'applies_to'),
+    for key, field in (('relative_review', 'applies_to'),
                        ('zero_fifty_ladder', 'steps_pct_below_one_year_high')):
         block = rules.get(key)
         if not isinstance(block, dict) or not block:
@@ -189,31 +189,106 @@ def main():
         not_evaluated.append('禁止清單（不下單、不換匯、不改券商設定）：'
                              f'{len(never)} 條，程式本身永遠不做這些事')
     for key in rules:
-        if key.startswith('_') or key in ('version', 'updated', 'review_line',
-                                          'zero_fifty_ladder', 'monthly_dca', 'never'):
+        if key.startswith('_') or key in ('version', 'updated', 'relative_review',
+                                          'zero_fifty_ladder', 'monthly_dca', 'never',
+                                          'positions_held_without_addition'):
             continue
         rule_problems.append(f'規則檔裡有這個程式不認得的規則「{key}」，它不會被檢查')
 
-    review = rules.get('review_line', {})
-    drop = Decimal(str(review.get('drop_pct', 0)))
-    for ticker in review.get('applies_to', []):
+    rel = rules.get('relative_review', {})
+    lookback = int(rel.get('lookback_trading_days') or 0)
+    lag_limit = Decimal(str(rel.get('lag_pct', 0)))
+    bench_ticker = rel.get('benchmark') or '0050'
+    template = rel.get('history_from') or 'data/tw/history_{ticker}.csv'
+
+    def change_over(ticker):
+        """Return (pct_change, first_date, last_date) or (None, reason, None)."""
+        path = ROOT / template.format(ticker=ticker)
+        if not path.exists():
+            return None, f'找不到 {ticker} 的歷史價格檔', None
+        rows = []
+        with path.open(encoding='utf-8-sig') as handle:
+            for row in csv.DictReader(handle):
+                close = (row.get('close') or '').strip()
+                date = (row.get('date') or '').strip()
+                if not close or not date:
+                    continue
+                try:
+                    value = Decimal(close)
+                except Exception:
+                    continue
+                if value > 0:
+                    rows.append((date, value))
+        rows.sort()
+        if len(rows) < lookback + 1:
+            return None, (f'{ticker} 的歷史價格只有 {len(rows)} 天，'
+                          f'不到比較需要的 {lookback + 1} 天'), None
+        start_date, start_price = rows[-(lookback + 1)]
+        end_date, end_price = rows[-1]
+        return (end_price - start_price) / start_price, start_date, end_date
+
+    bench_change, bench_from, bench_to = change_over(bench_ticker)
+    # This rule reads its own history files, not today's feed, so without this
+    # check it would go on answering confidently on a day the pipeline failed —
+    # the exact failure this project keeps finding.
+    history_problem = None
+    if feed_problem:
+        history_problem = f'今天的行情本身有問題，這個比較也不可信（{feed_problem}）'
+    elif bench_to:
+        try:
+            age = (dt.date.today() - dt.date.fromisoformat(bench_to)).days
+            if age > STALE_DAYS:
+                history_problem = (f'歷史價格停在 {bench_to}，已經 {age} 天沒更新，'
+                                   f'不能用來判斷現在的相對表現')
+        except ValueError:
+            history_problem = f'歷史價格的日期讀不懂（{bench_to}）'
+    for ticker in rel.get('applies_to', []):
         row = next((r for r in positions if r['ticker'] == ticker), None)
-        base = dict(rule='review_line', ticker=ticker,
-                    instrument=row['instrument'] if row else None, price_date=price_date)
+        base = dict(rule='relative_review', ticker=ticker,
+                    instrument=row['instrument'] if row else None,
+                    benchmark=bench_ticker, lookback_trading_days=lookback,
+                    price_date=price_date)
         if row is None:
             checks.append(dict(base, status='NO_DATA', reason='持股清單裡沒有這一檔'))
             continue
-        if ticker not in closes:
-            checks.append(dict(base, status='NO_DATA', reason='沒有這一檔的收盤價'))
+        if history_problem:
+            checks.append(dict(base, status='NO_DATA', reason=history_problem))
             continue
-        cost = Decimal(row['avg_cost'])
-        line = (cost * (1 - drop)).quantize(Decimal('0.01'))
-        price = closes[ticker]
-        gap = (price - line) / line
-        entry = dict(base, price=str(price), line=str(line), avg_cost=str(cost),
-                     gap_pct=str((gap * 100).quantize(Decimal('0.01'))))
-        entry['status'] = 'TRIGGERED' if price <= line else 'NEAR' if gap <= NEAR else 'CLEAR'
+        if bench_change is None:
+            checks.append(dict(base, status='NO_DATA',
+                               reason=f'沒有可比較的 {bench_ticker} 基準：{bench_from}'))
+            continue
+        change, since, until = change_over(ticker)
+        if change is None:
+            checks.append(dict(base, status='NO_DATA', reason=since))
+            continue
+        if until != bench_to:
+            # Comparing two different end dates is not a comparison.
+            checks.append(dict(base, status='NO_DATA',
+                               reason=f'{ticker} 的資料到 {until}，{bench_ticker} 到 {bench_to}，'
+                                      f'日期對不上，不能比較'))
+            continue
+        lag = change - bench_change
+        entry = dict(base, since=since, until=until,
+                     change_pct=str((change * 100).quantize(Decimal('0.01'))),
+                     benchmark_change_pct=str((bench_change * 100).quantize(Decimal('0.01'))),
+                     lag_pct=str((lag * 100).quantize(Decimal('0.01'))),
+                     limit_pct=str((lag_limit * 100).quantize(Decimal('0.01'))))
+        if lag <= -lag_limit:
+            entry['status'] = 'TRIGGERED'
+        elif lag <= -lag_limit + NEAR:
+            entry['status'] = 'NEAR'
+        else:
+            entry['status'] = 'CLEAR'
         checks.append(entry)
+
+    # A holding the rule names but cannot reach is stated, never left silent.
+    for ticker, reason in (rel.get('unavailable') or {}).items():
+        row = next((r for r in positions if r['ticker'] == ticker), None)
+        checks.append(dict(rule='relative_review', ticker=ticker,
+                           instrument=row['instrument'] if row else None,
+                           benchmark=bench_ticker, price_date=price_date,
+                           status='NO_DATA', reason=reason))
 
     ladder = rules.get('zero_fifty_ladder', {})
     ticker = ladder.get('ticker')
@@ -254,7 +329,10 @@ def main():
         price = closes[ticker]
         level = (high * (1 - Decimal(str(step)))).quantize(Decimal('0.01'))
         gap = (price - level) / level
+        amount = ladder.get('amount_twd_per_step')
         entry = dict(base, price=str(price), level=str(level), one_year_high=str(high),
+                     amount_twd_per_step=amount,
+                     shares_at_level=(int(Decimal(str(amount)) / level) if amount else None),
                      high_date=entry_high.get('one_year_high_date'), high_as_of=as_of,
                      high_source=entry_high.get('source'), high_is_stale=stale_high,
                      drawdown_pct=str(((high - price) / high * 100).quantize(Decimal('0.01'))))
@@ -302,25 +380,34 @@ def main():
     if feed_problem:
         lines += [f'**資料異常：{feed_problem}。**', '']
     for entry in triggered:
-        if entry['rule'] == 'review_line':
-            lines.append(f"**觸發｜{entry['ticker']} {entry['instrument']}**：收盤 {entry['price']}，"
-                         f"已跌破審查線 {entry['line']}（成本 {entry['avg_cost']}）。"
-                         f"觸發的是一次重新檢視，不是賣出指示。")
+        if entry['rule'] == 'relative_review':
+            lines.append(f"**觸發｜{entry['ticker']} {entry['instrument']}**："
+                         f"過去 {entry['lookback_trading_days']} 個交易日漲跌 {entry['change_pct']}%，"
+                         f"同期間 0050 是 {entry['benchmark_change_pct']}%，"
+                         f"落後 {entry['lag_pct']}%，超過 {entry['limit_pct']}% 的門檻。"
+                         f"這是提醒你重新看一次，不是賣出指示。")
         else:
             note = '（這一階你還沒核准執行）' if not entry['approved_for_execution'] else ''
+            buy = (f"照你設定的每階 {entry['amount_twd_per_step']} 元，這個價位約可買 "
+                   f"{entry['shares_at_level']} 股。這是照規則算出來的數字，不是建議你買。"
+                   if entry.get('shares_at_level') else '')
             lines.append(f"**觸發｜0050 第 {entry['step_pct']} 階**：收盤 {entry['price']}，"
-                         f"已到 {entry['level']}，距一年高點 {entry['drawdown_pct']}%。{note}")
+                         f"已到 {entry['level']}，距一年高點 {entry['drawdown_pct']}%。{note}{buy}")
     for entry in near:
-        if entry['rule'] == 'review_line':
-            lines.append(f"接近｜{entry['ticker']} {entry['instrument']}：收盤 {entry['price']}，"
-                         f"距審查線 {entry['line']} 還有 {entry['gap_pct']}%。")
+        if entry['rule'] == 'relative_review':
+            lines.append(f"接近｜{entry['ticker']} {entry['instrument']}："
+                         f"落後 0050 {entry['lag_pct']}%，門檻是 {entry['limit_pct']}%。")
         else:
+            buy = (f"照每階 {entry['amount_twd_per_step']} 元，到價時約可買 "
+                   f"{entry['shares_at_level']} 股。"
+                   if entry.get('shares_at_level') else '')
             lines.append(f"接近｜0050 第 {entry['step_pct']} 階：收盤 {entry['price']}，"
-                         f"距 {entry['level']} 還有一小段，目前距一年高點 {entry['drawdown_pct']}%。")
+                         f"距 {entry['level']} 還有一小段，目前距一年高點 "
+                         f"{entry['drawdown_pct']}%。{buy}")
     if no_data:
         lines += ['', '**這次無法判定的規則：**']
         for entry in no_data:
-            name = f"{entry['ticker']} 審查線" if entry['rule'] == 'review_line' \
+            name = f"{entry['ticker']} 相對 0050 檢視" if entry['rule'] == 'relative_review' \
                 else f"0050 第 {entry['step_pct']} 階加碼"
             lines.append(f"- {name}：{entry['reason']}")
     if rule_problems:
