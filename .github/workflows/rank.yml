@@ -1,0 +1,32 @@
+name: TW screen monthly snapshot + forward evaluation
+
+on:
+  schedule:
+    - cron: "30 11 12 * *"   # 12th, 19:30 Taipei, after tw.yml's 18:35 data run
+  push:
+    branches: [main]
+    paths: [.github/workflows/rank.yml]   # first snapshot when this file lands
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rank:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pandas==2.2.3
+      - name: Snapshot and evaluate
+        run: python scripts/rank_snapshot.py both
+      - name: Commit
+        run: |
+          git config user.name "jc-investing-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A data/snapshots results || true
+          git diff --cached --quiet || git commit -m "TW screen snapshot/evaluation $(date -u +%F)"
+          git pull --rebase && git push
