@@ -1,0 +1,51 @@
+name: Daily position check
+
+# Deterministic and free: no model, no network, no orders. Reads the holdings,
+# the approved rules and the TWSE close this repo already fetches, and writes
+# results/daily_check.json and results/daily_check.md for the reporting agent.
+on:
+  schedule:
+    - cron: "20 10 * * 1-5"   # 18:20 Taipei, weekdays, after the 18:05 TW fetch
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-position-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run the check
+        run: python scripts/daily_check.py | tee check_output.txt
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "## 每日部位檢查" >> "$GITHUB_STEP_SUMMARY"
+          cat check_output.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+      - name: Commit the result
+        shell: bash
+        run: |
+          rm -f check_output.txt
+          git config user.name "daily-check-bot"
+          git config user.email "daily-check-bot@users.noreply.github.com"
+          git add results/daily_check.json results/daily_check.md
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+          else
+            git commit -m "daily check $(date -u +%Y-%m-%d)"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
