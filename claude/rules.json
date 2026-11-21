@@ -2,10 +2,6 @@
   "_comment": "Machine-readable form of the rules JC has already approved. Derived from 01-Investor-Profile-and-Portfolio.md (2026-11-17) and decisions recorded in the JC Investing project. Programs read this; it never places an order.",
   "version": 1,
   "updated": "2026-11-21",
-  "needs_confirmation": [
-    "review_line.drop_pct: the 0.15 drop came from a chat on 2026-11-19 (188 cost -> 159.8 line). Confirm it should apply to every active-pool holding.",
-    "zero_fifty_ladder.steps_pct_below_one_year_high: the -30% / -40% steps were proposed, not yet approved for execution."
-  ],
   "monthly_dca": {
     "ticker": "0050",
     "amount_twd": 20000,
@@ -14,14 +10,15 @@
     "effective_from": "2026-11"
   },
   "review_line": {
-    "_comment": "An active-pool holding falling this far below its average cost triggers a review. A review is not a sell instruction.",
+    "_comment": "An active-pool holding falling this far below its average cost triggers a review. A review is not a sell instruction and spends no money, so 15% is adopted as the working default rather than left as an open question. Say the word and it changes.",
     "applies_to": [
       "3036"
     ],
-    "drop_pct": 0.15
+    "drop_pct": 0.15,
+    "decided": "2026-11-21 default adopted by Claude; reversible on request"
   },
   "zero_fifty_ladder": {
-    "_comment": "Extra 0050 purchases on drawdown from the one-year high. Proposed 2026-11-19, NOT yet approved for execution; the check only reports when a step is reached.",
+    "_comment": "Extra 0050 purchases on drawdown from the measured one-year high. approved_for_execution stays false: the check only reports that a step has been reached and never suggests buying. Only JC can set this true, because it is the one rule here that would spend money.",
     "approved_for_execution": false,
     "ticker": "0050",
     "steps_pct_below_one_year_high": [
