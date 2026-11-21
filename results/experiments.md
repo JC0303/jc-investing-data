@@ -54,6 +54,7 @@
 | a-clean | 2026-11-22 | A-track 完整窗口 | A、C | 4,975 筆 t=−1.311，不通過 | 回填 |
 | v3-clean | 2026-11-22 | 週反轉完整窗口 | V3、C | 2,939 筆 t=−0.465，不通過 | 回填 |
 | rank-forward | 2026-11-21 | v1.1 ADVANCE−REJECT、路徑 IC、A 分數 IC，1 與 3 月 | 3 月有效橫截面 ≥12、spread 和 IC 正、IC t≥2，其餘描述性 | 一個快照，樣本不足 | 回填 |
+| new-1 | 2026-11-22 | v2 逐公司原始申報時間，沿用內容、進出場與成本；開發期可取得 ≥387 個可結算公告日 | dev 先核對原始時間與覆蓋，未證實 387 即停止；若續驗，雙尾 p≤0.0125、全期 t>2、後半同號且 t>1.5、扣成本正、勝同期 0050，完整窗口限 2025-11-28 以前（含） | 2026-11-22 STOP：可核實 0／387 日，實際群數未知，未算績效。[92 頁來源盤點](new-1-filing-evidence.md) | 587055860235910333c92d1e92f996dcba180f4c820ec3aca20d5ef3d0726037 |
 
 V2、V3、A、V4 全部门檻分別見 [v2](tw_rev_momentum_v2_summary.md)、[v3](tw_reversal_v3_summary.md)、[A-track](tw_a_track_summary.md)、[v4](tw_v4_summary.md)。C 為[四項分群判定](clustered_performance.md)。分年與成本情境隨原實驗留存。[原始 grid](tw_v4_insample_grid.csv) 與[資料修正的中間結果](backtest_review_2026-11-22.md)。
 
