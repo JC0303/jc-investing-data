@@ -43,9 +43,21 @@ jobs:
         shell: bash
         run: echo "UPSTREAM_FETCH_CONCLUSION=${{ github.event.workflow_run.conclusion }}" >> "$GITHUB_ENV"
 
+      # pipefail matters here: without it the step's status is tee's, so a
+      # Python crash looked like a successful run.
       - name: Run the check
         continue-on-error: true
-        run: python scripts/daily_check.py | tee check_output.txt
+        shell: bash
+        run: |
+          set -o pipefail
+          python scripts/daily_check.py | tee check_output.txt
+
+      - name: Tests
+        if: always()
+        shell: bash
+        run: |
+          python -m pip install --quiet pytest pandas numpy
+          python -m pytest tests/ -q
 
       - name: Summary
         if: always()

@@ -93,18 +93,40 @@ def load_prices(tickers):
     return pd.DataFrame(adj), pd.DataFrame(close), pd.DataFrame(vol)
 
 
+def applicable_month(day):
+    """The revenue month a trading day is allowed to know about.
+
+    Taiwan monthly revenue for month M is published by the 10th of M+1, so a
+    trading day before the 10th may only use M-2, and from the 10th onward
+    M-1. This is a lookup, never a carry-forward.
+    """
+    y, m = day.year, day.month
+    back = 2 if day.day < 10 else 1
+    m -= back
+    while m < 1:
+        m += 12
+        y -= 1
+    return y, m
+
+
 def qualified_matrix(flags, cal, tickers):
+    """Eligibility per (day, ticker), from that day's applicable month only.
+
+    This used to place each flag at the first session on or after the 10th of
+    the following month and then ffill(). The forward fill was the bug: when a
+    later month had no computable revenue, the previous month's verdict stayed
+    in force indefinitely, so a day could be qualified on revenue that was by
+    then many months old. A month with no usable data is now simply not
+    eligible, which excludes the name from that day's candidates rather than
+    guessing at it.
+    """
+    known = {}
+    for r in flags.itertuples():
+        known[(r.ticker, int(r.year), int(r.month))] = bool(r.ok)
+    months = [applicable_month(d) for d in cal]
     q = pd.DataFrame(False, index=cal, columns=tickers)
-    for t, g in flags.groupby("ticker"):
-        if t not in q.columns:
-            continue
-        s = pd.Series(np.nan, index=cal, dtype="float")
-        for r in g.itertuples():
-            ny, nm = (r.year + (r.month == 12), r.month % 12 + 1)
-            idx = cal.searchsorted(pd.Timestamp(ny, nm, 10))
-            if idx < len(cal):
-                s.iloc[idx] = 1.0 if r.ok else 0.0
-        q[t] = s.ffill().fillna(0).astype(bool).values
+    for t in tickers:
+        q[t] = [known.get((t, y, m), False) for y, m in months]
     return q
 
 

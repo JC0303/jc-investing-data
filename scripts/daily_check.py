@@ -119,21 +119,31 @@ def tw_closes():
                     pass
     for ticker in conflicts:
         closes.pop(ticker, None)
+    # Every problem is collected before anything is returned. Returning on the
+    # first one let a later, more serious one go unchecked: a conflicting price
+    # used to return early and skip the feed check entirely, so a stale session
+    # plus one disputed ticker still produced priced verdicts.
+    problems = []
     if conflicts:
-        return closes, day, '收盤檔裡有同一檔股票的多個不同價格：' + '、'.join(sorted(conflicts))
+        problems.append('收盤檔裡有同一檔股票的多個不同價格：' + '、'.join(sorted(conflicts)))
     if not closes:
-        return {}, day, '台股收盤檔存在但沒有任何可用的收盤價'
+        problems.append('台股收盤檔存在但沒有任何可用的收盤價')
     if day is None:
-        return closes, None, '台股收盤檔沒有可辨識的日期'
+        # A price with no date cannot be checked against the expected session,
+        # so it cannot be known to be today's price.
+        problems.append('台股收盤檔沒有可辨識的日期')
     if feed_issue:
+        problems.append(feed_issue)
+    if day is not None:
+        if expected and day != expected:
+            problems.append(f'台股收盤資料日期是 {day}，但預期交易日是 {expected}')
+        age = (dt.date.today() - dt.date.fromisoformat(day)).days
+        if age > STALE_DAYS:
+            problems.append(f'台股收盤資料停在 {day}，已經 {age} 天沒更新')
+    if problems:
         # Drop the prices: a rule must never be judged against a session that
         # is not the one it is supposed to be judging.
-        return {}, day, feed_issue
-    if expected and day != expected:
-        return {}, day, f'台股收盤資料日期是 {day}，但預期交易日是 {expected}'
-    age = (dt.date.today() - dt.date.fromisoformat(day)).days
-    if age > STALE_DAYS:
-        return {}, day, f'台股收盤資料停在 {day}，已經 {age} 天沒更新'
+        return {}, day, '；'.join(problems)
     return closes, day, None
 
 
@@ -148,10 +158,36 @@ def main():
     # The rules this script knows how to evaluate. A key that is absent, empty
     # or the wrong shape means the rulebook changed under us: that is a data
     # problem, never an empty all-clear.
-    for key in ('review_line', 'zero_fifty_ladder'):
+    # The field each rule's loop iterates is as load-bearing as the rule block
+    # itself: an empty or missing list silently produced zero checks and a
+    # smaller rules_total, with nothing saying a rule had stopped being checked.
+    for key, field in (('review_line', 'applies_to'),
+                       ('zero_fifty_ladder', 'steps_pct_below_one_year_high')):
         block = rules.get(key)
         if not isinstance(block, dict) or not block:
             rule_problems.append(f'規則檔裡找不到或讀不懂「{key}」這條規則')
+            continue
+        items = block.get(field)
+        if not isinstance(items, list) or not items:
+            rule_problems.append(f'「{key}」這條規則的「{field}」是空的或不見了，'
+                                 f'這條規則這次完全沒有被檢查')
+    # Approved rules this script does not evaluate are still stated, so the
+    # report never implies the rulebook is only what it happened to check.
+    not_evaluated = []
+    dca = rules.get('monthly_dca')
+    if isinstance(dca, dict) and dca:
+        not_evaluated.append(
+            f"每月定期定額（{dca.get('ticker')} 每月 {dca.get('day_of_month')} 日 "
+            f"{dca.get('amount_twd')} 元）：這是固定扣款，不需要每日判斷，所以這個檢查不看它")
+    elif 'monthly_dca' in rules:
+        rule_problems.append('規則檔裡的「monthly_dca」讀不懂')
+    never = rules.get('never')
+    if not isinstance(never, list) or not never:
+        rule_problems.append('規則檔裡的「never」禁止清單是空的或不見了，'
+                             '這是不下單、不換匯、不改券商設定的那一條')
+    else:
+        not_evaluated.append('禁止清單（不下單、不換匯、不改券商設定）：'
+                             f'{len(never)} 條，程式本身永遠不做這些事')
     for key in rules:
         if key.startswith('_') or key in ('version', 'updated', 'review_line',
                                           'zero_fifty_ladder', 'monthly_dca', 'never'):
@@ -201,7 +237,18 @@ def main():
             # money would go, so without a measured high it is unchecked.
             checks.append(dict(base, status='NO_DATA', reason='還沒有實際量到的一年高點'))
             continue
-        high = Decimal(str(entry_high['one_year_high']))
+        try:
+            high = Decimal(str(entry_high['one_year_high']))
+        except (KeyError, TypeError, ArithmeticError, ValueError):
+            # A high record present but unreadable is the same as not having
+            # one. It used to raise here, which aborted the whole run after
+            # the earlier rules had already been evaluated.
+            checks.append(dict(base, status='NO_DATA',
+                               reason='一年高點紀錄裡沒有可用的數字'))
+            continue
+        if high <= 0:
+            checks.append(dict(base, status='NO_DATA', reason='一年高點不是正數'))
+            continue
         as_of = measured.get('as_of')
         stale_high = as_of is None or (dt.date.today() - dt.date.fromisoformat(as_of)).days > 45
         price = closes[ticker]
@@ -235,6 +282,10 @@ def main():
         generated_at=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
         price_date=price_date, feed_problem=feed_problem, rule_problems=rule_problems,
         data_problem=data_problem,
+        # These count rule instances (one ticker, one ladder step), not rule
+        # blocks: the old name "rules_total" read as the size of the rulebook.
+        rule_instances=len(checks), rule_instances_evaluated=len(checks) - len(no_data),
+        rules_not_evaluated_here=not_evaluated,
         rules_total=len(checks), rules_evaluated=len(checks) - len(no_data),
         checks=checks, triggered=triggered, near=near, no_data=no_data,
         unpriced_positions=unpriced,
@@ -300,6 +351,7 @@ def run():
         (out / 'daily_check.json').write_text(json.dumps(dict(
             generated_at=dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds'),
             price_date=None, feed_problem=message, rule_problems=[], data_problem=True,
+            rule_instances=0, rule_instances_evaluated=0, rules_not_evaluated_here=[],
             rules_total=0, rules_evaluated=0, checks=[], triggered=[], near=[], no_data=[],
             unpriced_positions=[], positions_as_of=None, crashed=True,
             something_to_report=True), indent=2, ensure_ascii=False) + '\n')
