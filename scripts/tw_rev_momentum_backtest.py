@@ -18,7 +18,12 @@ per trade >= -18,000.
 import io, time, sys, math, datetime as dt
 import pandas as pd, numpy as np, requests
 
-OUT_DIR = "results"
+if __name__ == "__main__":
+    from backtest_outcomes import SETTLED, coverage, holding_outcome
+else:
+    from scripts.backtest_outcomes import SETTLED, coverage, holding_outcome
+
+OUT_DIR = "results/session_audit"
 START_ROC_YEAR, START_MONTH = 109, 12   # 2020-12 (needed for 12-month window)
 END_YEAR, END_MONTH = 2026, 10
 COST = 0.00585
@@ -173,7 +178,7 @@ def run():
         ny, nm = (s.year + (s.month == 12), s.month % 12 + 1)
         tenth = pd.Timestamp(ny, nm, 10)
         idx = cal.searchsorted(tenth)
-        if idx + 1 + HOLD >= len(cal):
+        if idx + 1 >= len(cal):
             continue
         D, E = cal[idx], idx + 1
         t = tick[s.code]
@@ -186,40 +191,39 @@ def run():
         tv = (c * v).iloc[max(0, E - 20):E].mean()
         if not (tv >= MIN_VALUE) or not (c.iloc[idx] >= 10):
             continue
-        ent = a.iloc[E]
-        if not (ent > 0):
-            missing += 1
-            continue
-        exit_i = E + HOLD
-        for d in range(1, HOLD):
-            px = a.iloc[E + d]
-            if px <= ent * STOP:
-                exit_i = E + d + 1
-                break
-        ex = a.iloc[exit_i]
-        if not (ex > 0):
-            missing += 1
-            continue
-        b = adj["0050.TW"]
-        ret = ex / ent - 1 - COST
-        bret = b.iloc[exit_i] / b.iloc[E] - 1
-        trades.append(dict(code=s.code, mkt=s.mkt, rev_month=f"{s.year}-{s.month:02d}", entry=cal[E].date(),
-                           exit=cal[exit_i].date(), yoy=round(s.yoy, 4), accel=round(s.accel, 4),
-                           ret_net=ret, bench=bret, excess=ret - bret, stopped=exit_i < E + HOLD))
-    tr = pd.DataFrame(trades)
+        status, x, reason = holding_outcome(a.to_numpy(), E, HOLD, STOP)
+        entry_date = cal[E]
+        exit_date = cal[x] if x is not None else pd.NaT
+        ret = bret = np.nan
+        if status == SETTLED:
+            ret = a.at[exit_date] / a.at[entry_date] - 1 - COST
+            b = adj["0050.TW"]
+            bret = b.at[exit_date] / b.at[entry_date] - 1
+        trades.append(dict(code=s.code, mkt=s.mkt, signal=D.date(), rev_month=f"{s.year}-{s.month:02d}",
+                           yoy=round(s.yoy, 4), accel=round(s.accel, 4),
+                           entry=entry_date.date(), entry_price=a.at[entry_date] if reason != "missing_entry" else np.nan,
+                           exit=exit_date.date(), status=status, reason=reason,
+                           ret_net=ret, bench=bret, excess=ret - bret,
+                           stopped=(reason == "stop") if status == SETTLED else None))
+    tr = pd.DataFrame(trades, columns=["code", "mkt", "signal", "rev_month", "yoy", "accel", "entry",
+                                       "entry_price", "exit", "status", "reason", "ret_net", "bench", "excess", "stopped"])
     tr.to_csv(f"{OUT_DIR}/tw_rev_momentum_v2_trades.csv", index=False)
 
+    admitted = tr
+    tr = admitted[admitted.status == SETTLED].copy()
     n = len(tr)
     mean, sd = tr.excess.mean(), tr.excess.std(ddof=1)
-    tstat = mean / (sd / math.sqrt(n)) if n > 1 else float("nan")
+    tstat = mean / (sd / math.sqrt(n)) if n > 1 and sd > 0 else float("nan")
     tr["entry_year"] = pd.to_datetime(tr.entry).dt.year
     by_year = tr.groupby("entry_year").excess.agg(["count", "mean"])
     yrs_pos = sum(by_year.loc[y, "mean"] > 0 for y in (2022, 2023, 2024, 2025) if y in by_year.index)
     cut = tr.excess.quantile(0.95)
     trimmed = tr[tr.excess < cut].excess.mean()
-    top3 = tr.sort_values("accel", ascending=False).groupby("rev_month").head(3)
+    top3 = admitted.sort_values("accel", ascending=False).groupby("rev_month").head(3)
     monthly = top3.groupby("rev_month").ret_net.sum() * POS
     worst3 = monthly.sort_index().rolling(3).sum().min()
+    if top3.excess.isna().any():
+        worst3 = float("nan")
     checks = {
         "1 trades >= 200": n >= 200,
         "2 mean excess > 0 and t >= 2": bool(mean > 0 and tstat >= 2),
@@ -228,19 +232,21 @@ def run():
         "5 worst rolling 3-month PnL (top-3/month, TWD 16k) >= -18,000": bool(worst3 >= -18000),
     }
     passed = all(checks.values())
+    overall = "INCOMPLETE" if len(admitted) > n else ("PASS" if passed else "FAIL")
     lines = [
         "# Short-term v2 backtest result (rule frozen 2026-11-12, claude/08)",
         f"Run (UTC): {dt.datetime.utcnow():%Y-%m-%d %H:%M}",
+        coverage(admitted),
         f"Revenue pages failed: {len(errors)}" + (" — " + "; ".join(errors[:5]) if errors else ""),
         f"Signals: {len(sig)}; trades: {n}; signals without price data (likely delisted/unavailable, survivorship bias): {missing}",
         f"Mean net return per trade: {tr.ret_net.mean():.4%}; mean 0050 same window: {tr.bench.mean():.4%}",
         f"Mean excess: {mean:.4%}; t-stat: {tstat:.2f}; median excess: {tr.excess.median():.4%}; win rate vs 0050: {(tr.excess > 0).mean():.1%}",
         f"Stopped out: {tr.stopped.mean():.1%}; worst trade net: {tr.ret_net.min():.2%}",
         f"Mean excess without top 5%: {trimmed:.4%}",
-        f"Top-3/month subset: trades {len(top3)}, mean excess {top3.excess.mean():.4%}; worst rolling 3-month PnL TWD {worst3:,.0f}",
+        f"Top-3/month subset: admitted {len(top3)}, settled {top3.excess.count()}, mean excess {top3.excess.mean():.4%}; worst rolling 3-month PnL TWD {worst3:,.0f}",
         "", "By entry year:", by_year.to_string(), "", "Checks:",
     ] + [f"- {k}: {'PASS' if v else 'FAIL'}" for k, v in checks.items()] + [
-        "", f"OVERALL: {'PASS' if passed else 'FAIL'}",
+        "", f"OVERALL: {overall}",
     ]
     open(f"{OUT_DIR}/tw_rev_momentum_v2_summary.md", "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
