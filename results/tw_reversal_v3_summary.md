@@ -1,7 +1,7 @@
 # Short-term v3 (attempt #2) backtest result (rule frozen 2026-11-12, claude/11)
-Run (UTC): 2026-11-21 16:05
+Run (UTC): 2026-11-21 16:13
 Universe tickers: 1864; with price data: 1864; signal weeks: 248; trades: 2939
-Admitted: 2941; settled: 2939; period price missing: 2; exit price missing: 0
+Admitted: 2941; complete windows: 2941; WINDOW_INCOMPLETE: 0; settled: 2939; period price missing: 2; exit price missing: 0
 Mean net return per trade: 0.5086%; mean 0050 same window: 0.8578%
 Mean excess: -0.3491%; week-clustered t: -2.80 (228 weeks); median excess: -1.3893%; win rate vs 0050: 41.7%
 Stopped out: 14.0%; worst trade net: -25.59%

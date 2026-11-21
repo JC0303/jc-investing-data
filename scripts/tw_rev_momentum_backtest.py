@@ -19,9 +19,9 @@ import io, time, sys, math, datetime as dt
 import pandas as pd, numpy as np
 
 if __name__ == "__main__":
-    from backtest_outcomes import SETTLED, coverage, holding_outcome
+    from backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome
 else:
-    from scripts.backtest_outcomes import SETTLED, coverage, holding_outcome
+    from scripts.backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome
 
 OUT_DIR = "results"
 START_ROC_YEAR, START_MONTH = 109, 12   # 2020-12 (needed for 12-month window)
@@ -211,7 +211,8 @@ def run():
     tr.to_csv(f"{OUT_DIR}/tw_rev_momentum_v2_trades.csv", index=False)
 
     admitted = tr
-    tr = admitted[admitted.status == SETTLED].copy()
+    complete = admitted[admitted.status != WINDOW_INCOMPLETE]
+    tr = complete[complete.status == SETTLED].copy()
     n = len(tr)
     mean, sd = tr.excess.mean(), tr.excess.std(ddof=1)
     tstat = mean / (sd / math.sqrt(n)) if n > 1 and sd > 0 else float("nan")
@@ -220,7 +221,7 @@ def run():
     yrs_pos = sum(by_year.loc[y, "mean"] > 0 for y in (2022, 2023, 2024, 2025) if y in by_year.index)
     cut = tr.excess.quantile(0.95)
     trimmed = tr[tr.excess < cut].excess.mean()
-    top3 = admitted.sort_values("accel", ascending=False).groupby("rev_month").head(3)
+    top3 = complete.sort_values("accel", ascending=False).groupby("rev_month").head(3)
     monthly = top3.groupby("rev_month").ret_net.sum() * POS
     worst3 = monthly.sort_index().rolling(3).sum().min()
     if top3.excess.isna().any():
@@ -233,7 +234,7 @@ def run():
         "5 worst rolling 3-month PnL (top-3/month, TWD 16k) >= -18,000": None if pd.isna(worst3) else bool(worst3 >= -18000),
     }
     passed = all(checks.values())
-    overall = "INCOMPLETE" if len(admitted) > n else ("PASS" if passed else "FAIL")
+    overall = "INCOMPLETE" if n == 0 or len(complete) > n else ("PASS" if passed else "FAIL")
     lines = [
         "# Short-term v2 backtest result (rule frozen 2026-11-12, claude/08)",
         f"Run (UTC): {dt.datetime.utcnow():%Y-%m-%d %H:%M}",

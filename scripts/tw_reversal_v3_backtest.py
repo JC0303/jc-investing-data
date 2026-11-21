@@ -30,9 +30,9 @@ import numpy as np
 import pandas as pd
 
 if __name__ == "__main__":
-    from backtest_outcomes import SETTLED, coverage, holding_outcome
+    from backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome
 else:
-    from scripts.backtest_outcomes import SETTLED, coverage, holding_outcome
+    from scripts.backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome
 
 OUT_DIR = "results"
 COST = 0.00585
@@ -116,7 +116,8 @@ def run():
                                        "status", "reason", "ret_net", "bench", "excess", "stopped"])
     tr.to_csv(f"{OUT_DIR}/tw_reversal_v3_trades.csv", index=False)
     admitted = tr
-    tr = admitted[admitted.status == SETTLED].copy()
+    complete = admitted[admitted.status != WINDOW_INCOMPLETE]
+    tr = complete[complete.status == SETTLED].copy()
     n = len(tr)
     lines = ["# Short-term v3 (attempt #2) backtest result (rule frozen 2026-11-12, claude/11)",
              f"Run (UTC): {dt.datetime.utcnow():%Y-%m-%d %H:%M}",
@@ -132,9 +133,10 @@ def run():
         by_year = tr.groupby("entry_year").excess.agg(["count", "mean"])
         yrs_pos = sum(by_year.loc[y, "mean"] > 0 for y in (2022, 2023, 2024, 2025) if y in by_year.index)
         trimmed = tr[tr.excess < tr.excess.quantile(0.95)].excess.mean()
-        top1 = admitted.sort_values("rel").groupby("signal").head(1).sort_values("signal")
+        top1 = complete.sort_values("rel").groupby("signal").head(1).sort_values("signal")
         wk_pnl = top1.set_index(pd.to_datetime(top1.signal)).ret_net * POS
-        wk_pnl = wk_pnl.reindex(pd.to_datetime(pd.Series(sig_days)), fill_value=0)
+        complete_weeks = [s for s in sig_days if cal.get_loc(s) + 1 + HOLD < len(cal)]
+        wk_pnl = wk_pnl.reindex(pd.DatetimeIndex(complete_weeks), fill_value=0)
         worst13 = wk_pnl.rolling(13).sum().min()
         hold = tr[pd.to_datetime(tr.entry) >= "2025-01-01"].excess
         if top1.excess.isna().any():
@@ -147,7 +149,7 @@ def run():
             "5 top-1/week worst rolling 13-week PnL (TWD 16k) >= -18,000": None if pd.isna(worst13) else bool(worst13 >= -18000),
             "6 holdout 2025-01..2026-10 mean excess > 0": bool(len(hold) > 0 and hold.mean() > 0),
         }
-        overall = "INCOMPLETE" if len(admitted) > n else ("PASS" if all(checks.values()) else "FAIL")
+        overall = "INCOMPLETE" if n == 0 or len(complete) > n else ("PASS" if all(checks.values()) else "FAIL")
         lines += [
             f"Mean net return per trade: {tr.ret_net.mean():.4%}; mean 0050 same window: {tr.bench.mean():.4%}",
             f"Mean excess: {mean:.4%}; week-clustered t: {tcl:.2f} ({len(wkmean)} weeks); median excess: {tr.excess.median():.4%}; win rate vs 0050: {(tr.excess > 0).mean():.1%}",

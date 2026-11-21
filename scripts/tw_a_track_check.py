@@ -42,9 +42,9 @@ import numpy as np
 import pandas as pd
 
 if __name__ == "__main__":
-    from backtest_outcomes import SETTLED, coverage, holding_outcome, valid_price
+    from backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome, valid_price
 else:
-    from scripts.backtest_outcomes import SETTLED, coverage, holding_outcome, valid_price
+    from scripts.backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome, valid_price
 
 OUT = "results"
 COST_STOCK = 0.00585
@@ -154,7 +154,7 @@ def simulate(cands, adj, b, cal, cap, executable):
             taken += 1
             status, x, why = holding_outcome(a, E, HOLD, STOP, target=TARGET, next_close=executable)
             # An unresolved path reserves the name through its latest possible exit.
-            held_until[c.ticker] = x if status == SETTLED else E + HOLD + int(executable)
+            held_until[c.ticker] = x if status in (SETTLED, WINDOW_INCOMPLETE) and x is not None else E + HOLD + int(executable)
             ret = bret = np.nan
             if status == SETTLED:
                 ret = a[x] / a[E] - 1 - COST_STOCK
@@ -242,7 +242,7 @@ def run(prices=None):
              "", *describe(admitted, "MAIN (rule as live)"),
              "", "By signal year (count, mean excess):", main.groupby("yr").excess.agg(["count", "mean"]).to_string(),
              "", "Pass checks:"] + [f"- {k}: {'PASS' if v else 'FAIL'}" for k, v in checks.items()]
-    overall = "INCOMPLETE" if len(main) < len(admitted) else ("PASS" if all(checks.values()) else "FAIL")
+    overall = "INCOMPLETE" if main.empty or len(main) < (admitted.status != WINDOW_INCOMPLETE).sum() else ("PASS" if all(checks.values()) else "FAIL")
     lines += ["", f"OVERALL: {overall}",
               "", "Diagnostics (not adoptable as rules):", *describe(d1, "D1 executable exit (next-day close)"),
               *describe(admitted[admitted.r1 >= 0.095], "D2a signal-day return >= 9.5% (limit-up chase)"),

@@ -1,6 +1,7 @@
 """Classify an admitted trade without substituting a price for a missing bar."""
 import math
 
+WINDOW_INCOMPLETE = "WINDOW_INCOMPLETE"
 SETTLED = "SETTLED"
 PERIOD_MISSING = "PERIOD_PRICE_MISSING"
 EXIT_MISSING = "EXIT_PRICE_MISSING"
@@ -11,7 +12,16 @@ def valid_price(value):
 
 
 def holding_outcome(prices, entry, horizon, stop, *, target=None, next_close=True):
-    """Return (status, exit index if known, reason). A missing stop check makes exit unknown."""
+    """Use the maximum possible window to decide whether this cohort can be scored."""
+    status, exit_index, reason = observed_exit(prices, entry, horizon, stop, target, next_close)
+    latest_exit = entry + horizon + int(target is not None and next_close)
+    if latest_exit >= len(prices):
+        # Keep a known execution for position tracking, but never score its return.
+        return WINDOW_INCOMPLETE, exit_index if status == SETTLED else None, reason
+    return status, exit_index, reason
+
+
+def observed_exit(prices, entry, horizon, stop, target, next_close):
     if not valid_price(prices[entry]):
         return PERIOD_MISSING, None, "missing_entry"
     end = entry + horizon
@@ -39,6 +49,8 @@ def holding_outcome(prices, entry, horizon, stop, *, target=None, next_close=Tru
 
 def coverage(rows):
     counts = rows.status.value_counts()
-    return (f"Admitted: {len(rows)}; settled: {counts.get(SETTLED, 0)}; "
+    incomplete = counts.get(WINDOW_INCOMPLETE, 0)
+    return (f"Admitted: {len(rows)}; complete windows: {len(rows) - incomplete}; "
+            f"WINDOW_INCOMPLETE: {incomplete}; settled: {counts.get(SETTLED, 0)}; "
             f"period price missing: {counts.get(PERIOD_MISSING, 0)}; "
             f"exit price missing: {counts.get(EXIT_MISSING, 0)}")

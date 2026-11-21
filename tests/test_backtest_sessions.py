@@ -18,7 +18,8 @@ def quotes(ticker):
     return adj, q.close.to_frame(ticker), q.volume.to_frame(ticker)
 
 
-def test_unsettled_atrack_candidate_keeps_slot_and_blocks_duplicate():
+def test_unsettled_atrack_candidate_keeps_slot_and_blocks_duplicate(monkeypatch):
+    monkeypatch.setattr(atrack, "HOLD", 5)  # this short fixture contains the full test window
     adj, _, _ = quotes("1560.TW")
     cal = adj.index
     d = cal.get_loc("2022-01-07")
@@ -79,3 +80,27 @@ def test_v2_stop_triggered_before_time_exit_counts_as_stop(monkeypatch, tmp_path
     row = run_v2(monkeypatch, tmp_path, adj, close, volume)
     assert row.exit == "2024-06-26"
     assert row.stopped
+
+
+@pytest.mark.parametrize("early_stop", [True, False])
+def test_v2_immature_cohort_never_enters_mean(monkeypatch, tmp_path, early_stop):
+    adj, close, volume = quotes("1101.TW")
+    adj = adj.loc[:"2024-06-25"].copy()  # one session short of the time exit
+    if early_stop:
+        adj.loc["2024-06-13", "1101.TW"] = .90 * adj.at[pd.Timestamp("2024-06-12"), "1101.TW"]
+    row = run_v2(monkeypatch, tmp_path, adj, close, volume)
+    assert row.status == "WINDOW_INCOMPLETE"
+    assert pd.isna(row.excess)
+    assert "complete windows: 0" in (tmp_path / "tw_rev_momentum_v2_summary.md").read_text()
+
+
+@pytest.mark.parametrize("target,next_close,extra", [(None, True, 0), (1.15, False, 0), (1.15, True, 1)])
+def test_window_boundary_independent_of_exit_path(target, next_close, extra):
+    from scripts.backtest_outcomes import holding_outcome
+
+    for second_price in (80, 120, 100):
+        prices = [100, second_price, 100, 100, 100]
+        for available, expected in [(3 + extra, "WINDOW_INCOMPLETE"), (4 + extra, "SETTLED")]:
+            status, _, _ = holding_outcome(prices[:available], 0, 3, .92, target=target,
+                                            next_close=next_close)
+            assert status == expected
