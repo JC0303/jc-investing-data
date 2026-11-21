@@ -1,0 +1,70 @@
+name: Frozen TW research
+on:
+  push:
+    branches: [research/evidence-and-holdout]
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [dev, final]
+        required: true
+      experiment:
+        description: Registered ID (program at experiments/<ID>.py)
+        required: true
+permissions:
+  contents: read
+jobs:
+  train-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python scripts/research_partition.py export-train training
+      - name: Verify training sandbox with no final data
+        run: |
+          python - <<'PY'
+          import sys, subprocess
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from research_partition import docker_command
+          bundle = Path('training')
+          smoke = bundle / 'strategy.py'
+          smoke.write_text("import os, pathlib\nassert sorted(os.listdir('.')) == ['A-track.csv','strategy.py','v2.csv','v3.csv']\nassert 'GITHUB_TOKEN' not in os.environ\nassert not pathlib.Path('/github/workspace').exists()\n")
+          subprocess.run(docker_command(bundle), check=True)
+          smoke.unlink()
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: training-ledgers
+          path: training/*.csv
+  develop:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - env:
+          ID: ${{ inputs.experiment }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/research_partition.py dev "experiments/$ID.py" --id "$ID"
+  final:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'final' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: research-final
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - env:
+          ID: ${{ inputs.experiment }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python scripts/research_partition.py final "experiments/$ID.py" --id "$ID"
