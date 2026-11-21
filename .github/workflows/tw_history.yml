@@ -1,0 +1,53 @@
+name: TW price history and 52-week highs
+
+# Builds a real price history from TWSE so no rule rests on an estimated high.
+# Monthly is enough: the window only moves as months roll off.
+on:
+  schedule:
+    - cron: "40 11 3 * *"   # 19:40 Taipei on the 3rd
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tw-price-history
+  cancel-in-progress: false
+
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet requests
+
+      - name: Fetch history and compute highs
+        run: python scripts/tw_price_history.py | tee history_output.txt
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          echo '## TW price history' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          tail -c 3000 history_output.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit
+        shell: bash
+        run: |
+          rm -f history_output.txt
+          git config user.name "tw-history-bot"
+          git config user.email "tw-history-bot@users.noreply.github.com"
+          git add data/tw/history_*.csv data/tw/highs.json
+          if git diff --cached --quiet; then
+            echo "No change."
+          else
+            git commit -m "tw price history $(date -u +%Y-%m-%d)"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
