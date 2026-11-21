@@ -72,10 +72,20 @@ def main():
 
     ladder = rules.get('zero_fifty_ladder', {})
     ticker = ladder.get('ticker')
-    if ticker and ticker in closes and ladder.get('one_year_high_twd'):
-        high = Decimal(str(ladder['one_year_high_twd']))
-        as_of = dt.date.fromisoformat(ladder['one_year_high_as_of'])
-        stale = (dt.date.today() - as_of).days > ladder.get('one_year_high_stale_after_days', 30)
+    measured = {}
+    highs_path = ROOT / (ladder.get('one_year_high_from') or 'data/tw/highs.json')
+    if highs_path.exists():
+        measured = json.loads(highs_path.read_text(encoding='utf-8'))
+    entry_high = (measured.get('highs') or {}).get(ticker or '', {})
+    if ticker and ticker in closes and not entry_high:
+        # Never fall back to an estimated high: the ladder decides where money
+        # goes, so without a measured high the step is reported as unchecked.
+        unchecked.append(dict(ticker=ticker,
+                              reason='還沒有實際量到的一年高點，分批加碼的價位無法計算'))
+    if ticker and ticker in closes and entry_high:
+        high = Decimal(str(entry_high['one_year_high']))
+        as_of = dt.date.fromisoformat(measured.get('as_of') or dt.date.today().isoformat())
+        stale = (dt.date.today() - as_of).days > 45
         price = closes[ticker]
         drawdown = (high - price) / high
         for step in ladder.get('steps_pct_below_one_year_high', []):
@@ -84,7 +94,8 @@ def main():
             entry = dict(rule='zero_fifty_ladder', ticker=ticker, step_pct=str(step),
                          price=str(price), level=str(level),
                          drawdown_pct=str((drawdown * 100).quantize(Decimal('0.01'))),
-                         one_year_high=str(high), high_as_of=str(as_of),
+                         one_year_high=str(high), high_date=entry_high.get('one_year_high_date'),
+                         high_as_of=str(as_of), high_source=entry_high.get('source'),
                          high_is_stale=stale, approved_for_execution=
                          ladder.get('approved_for_execution', False), price_date=price_date)
             if price <= level:
@@ -123,7 +134,7 @@ def main():
         else:
             lines.append(f"接近｜0050 第 {entry['step_pct']} 階：收盤 {entry['price']}，距 {entry['level']} 還有一小段。")
     if any(e.get('high_is_stale') for e in alerts + watch):
-        lines += ['', f"注意：0050 的一年高點是 {ladder.get('one_year_high_as_of')} 推算的，已經過期，上面的階梯價位需要重算。"]
+        lines += ['', f"注意：0050 的一年高點資料已超過 45 天沒更新（最後更新 {measured.get('as_of')}），上面的階梯價位需要重算。"]
     if unchecked:
         lines += ['', '沒有檢查到的部位：'] + [f"- {u['ticker']}：{u['reason']}" for u in unchecked]
     (out / 'daily_check.md').write_text('\n'.join(lines) + '\n')

@@ -3,8 +3,8 @@
   "version": 1,
   "updated": "2026-11-21",
   "needs_confirmation": [
-    "review_line.drop_pct: the 0.15 drop used for 3036 came from a chat on 2026-11-19 (188 cost -> 159.8 line). Confirm it should apply to every active-pool holding.",
-    "zero_fifty_ladder.high: the one-year high is recomputed from data each run; confirm the -30% / -40% steps."
+    "review_line.drop_pct: the 0.15 drop came from a chat on 2026-11-19 (188 cost -> 159.8 line). Confirm it should apply to every active-pool holding.",
+    "zero_fifty_ladder.steps_pct_below_one_year_high: the -30% / -40% steps were proposed, not yet approved for execution."
   ],
   "monthly_dca": {
     "ticker": "0050",
@@ -28,10 +28,8 @@
       0.3,
       0.4
     ],
-    "one_year_high_twd": 116.5,
-    "one_year_high_as_of": "2026-11-19",
-    "one_year_high_source": "derived 2026-11-19 from a quoted price and drawdown; refresh needed - no price history is stored in this repo",
-    "one_year_high_stale_after_days": 30
+    "one_year_high_from": "data/tw/highs.json",
+    "_one_year_high_note": "Measured from TWSE STOCK_DAY by scripts/tw_price_history.py. The previous value, 116.5, was derived in conversation on 2026-11-19 and is no longer used: a number that decides where money is spent is looked up, not estimated."
   },
   "never": [
     "place, modify or cancel any order",
