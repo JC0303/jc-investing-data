@@ -57,6 +57,8 @@
 
 V2、V3、A、V4 全部门檻分別見 [v2](tw_rev_momentum_v2_summary.md)、[v3](tw_reversal_v3_summary.md)、[A-track](tw_a_track_summary.md)、[v4](tw_v4_summary.md)。C 為[四項分群判定](clustered_performance.md)。分年與成本情境隨原實驗留存。[原始 grid](tw_v4_insample_grid.csv) 與[資料修正的中間結果](backtest_review_2026-11-22.md)。
 
+| new-1 | 2026-11-22 | v2 逐公司原始申報時間，沿用內容、進出場與成本；開發期可取得 ≥387 個可結算公告日 | dev 先核對原始時間與覆蓋，未證實 387 即停止；若續驗，雙尾 p≤0.0125、全期 t>2、後半同號且 t>1.5、扣成本正、勝同期 0050，完整窗口限 2025-11-28 以前（含） | REGISTERED | 587055860235910333c92d1e92f996dcba180f4c820ec3aca20d5ef3d0726037 |
+
 ## 後續測試
 
 同一研究問題的選股、持有期、市場、事件間隔及主要結果選擇都要計入家族。對事前封閉的 N 個比較，雙尾 Bonferroni 要求 p ≤ 0.05/N，正向臨界 t 是 t 分布的 (1−0.05/(2N)) 分位數，自由度 G−1。仍需通過全部原門檻。相關變體同樣適用，但每個個別 p 值必須有效。只計勝出者會低估 N。
