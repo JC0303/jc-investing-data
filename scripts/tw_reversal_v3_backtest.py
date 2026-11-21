@@ -29,6 +29,11 @@ import time
 import numpy as np
 import pandas as pd
 
+if __name__ == "__main__":
+    from backtest_outcomes import SETTLED, coverage, holding_outcome
+else:
+    from scripts.backtest_outcomes import SETTLED, coverage, holding_outcome
+
 OUT_DIR = "results"
 COST = 0.00585
 HOLD = 5
@@ -87,37 +92,38 @@ def run():
     trades = []
     for s in sig_days:
         i = cal.get_loc(s)
-        if i + 1 + HOLD >= len(cal):
+        if i + 1 >= len(cal):
             continue
         rel = r5_all.loc[s] - b5.loc[s]
         ok = (tv20.loc[s] >= MIN_VALUE) & (close.loc[s, names] >= MIN_PX) & volok.loc[s] \
             & (r5_all.loc[s] <= R5_MAX) & (rel <= REL_MAX)
         for t in ok[ok].index:
             E = i + 1
-            ent = adj[t].iloc[E]
-            if not ent > 0:
-                continue
-            exit_i = E + HOLD
-            for d in range(1, HOLD):
-                if adj[t].iloc[E + d] <= ent * STOP:
-                    exit_i = E + d + 1
-                    break
-            ex = adj[t].iloc[exit_i]
-            if not ex > 0:
-                continue
-            ret = ex / ent - 1 - COST
-            bret = b.iloc[exit_i] / b.iloc[E] - 1
-            trades.append(dict(ticker=t, signal=s.date(), entry=cal[E].date(), exit=cal[exit_i].date(),
-                               r5=round(r5_all.loc[s, t], 4), rel=round(rel[t], 4),
-                               ret_net=ret, bench=bret, excess=ret - bret, stopped=exit_i < E + HOLD))
-    tr = pd.DataFrame(trades)
+            a = adj[t]
+            status, x, reason = holding_outcome(a.to_numpy(), E, HOLD, STOP)
+            entry_date = cal[E]
+            exit_date = cal[x] if x is not None else pd.NaT
+            ret = bret = np.nan
+            if status == SETTLED:
+                ret = a.at[exit_date] / a.at[entry_date] - 1 - COST
+                bret = b.at[exit_date] / b.at[entry_date] - 1
+            trades.append(dict(ticker=t, signal=s.date(), r5=round(r5_all.loc[s, t], 4), rel=round(rel[t], 4),
+                               entry=entry_date.date(), entry_price=a.at[entry_date] if reason != "missing_entry" else np.nan,
+                               exit=exit_date.date(), status=status, reason=reason,
+                               ret_net=ret, bench=bret, excess=ret - bret,
+                               stopped=(reason == "stop") if status == SETTLED else None))
+    tr = pd.DataFrame(trades, columns=["ticker", "signal", "r5", "rel", "entry", "entry_price", "exit",
+                                       "status", "reason", "ret_net", "bench", "excess", "stopped"])
     tr.to_csv(f"{OUT_DIR}/tw_reversal_v3_trades.csv", index=False)
+    admitted = tr
+    tr = admitted[admitted.status == SETTLED].copy()
     n = len(tr)
     lines = ["# Short-term v3 (attempt #2) backtest result (rule frozen 2026-11-12, claude/11)",
              f"Run (UTC): {dt.datetime.utcnow():%Y-%m-%d %H:%M}",
              f"Universe tickers: {n_uni}; with price data: {adj.shape[1] - 1}; signal weeks: {len(sig_days)}; trades: {n}"]
+    lines.append(coverage(admitted))
     if n == 0:
-        lines += ["No trades.", "OVERALL: FAIL"]
+        lines += ["No settled trades.", "OVERALL: INCOMPLETE" if len(admitted) else "OVERALL: FAIL"]
     else:
         mean = tr.excess.mean()
         wkmean = tr.groupby("signal").excess.mean()
@@ -126,31 +132,34 @@ def run():
         by_year = tr.groupby("entry_year").excess.agg(["count", "mean"])
         yrs_pos = sum(by_year.loc[y, "mean"] > 0 for y in (2022, 2023, 2024, 2025) if y in by_year.index)
         trimmed = tr[tr.excess < tr.excess.quantile(0.95)].excess.mean()
-        top1 = tr.sort_values("rel").groupby("signal").head(1).sort_values("signal")
+        top1 = admitted.sort_values("rel").groupby("signal").head(1).sort_values("signal")
         wk_pnl = top1.set_index(pd.to_datetime(top1.signal)).ret_net * POS
         wk_pnl = wk_pnl.reindex(pd.to_datetime(pd.Series(sig_days)), fill_value=0)
         worst13 = wk_pnl.rolling(13).sum().min()
         hold = tr[pd.to_datetime(tr.entry) >= "2025-01-01"].excess
+        if top1.excess.isna().any():
+            worst13 = float("nan")
         checks = {
             "1 trades >= 200": n >= 200,
             "2 mean excess > 0 and week-clustered t >= 2": bool(mean > 0 and tcl >= 2),
             "3 >= 3 of 2022-2025 years positive": yrs_pos >= 3,
             "4 mean excess > 0 without top 5%": bool(trimmed > 0),
-            "5 top-1/week worst rolling 13-week PnL (TWD 16k) >= -18,000": bool(worst13 >= -18000),
+            "5 top-1/week worst rolling 13-week PnL (TWD 16k) >= -18,000": None if pd.isna(worst13) else bool(worst13 >= -18000),
             "6 holdout 2025-01..2026-10 mean excess > 0": bool(len(hold) > 0 and hold.mean() > 0),
         }
+        overall = "INCOMPLETE" if len(admitted) > n else ("PASS" if all(checks.values()) else "FAIL")
         lines += [
             f"Mean net return per trade: {tr.ret_net.mean():.4%}; mean 0050 same window: {tr.bench.mean():.4%}",
             f"Mean excess: {mean:.4%}; week-clustered t: {tcl:.2f} ({len(wkmean)} weeks); median excess: {tr.excess.median():.4%}; win rate vs 0050: {(tr.excess > 0).mean():.1%}",
             f"Stopped out: {tr.stopped.mean():.1%}; worst trade net: {tr.ret_net.min():.2%}",
             f"Mean excess without top 5%: {trimmed:.4%}",
-            f"Top-1/week: trades {len(top1)}, mean excess {top1.excess.mean():.4%}, median {top1.excess.median():.4%}; worst rolling 13-week PnL TWD {worst13:,.0f}",
+            f"Top-1/week: admitted {len(top1)}, settled {top1.excess.count()}, mean excess {top1.excess.mean():.4%}, median {top1.excess.median():.4%}; worst rolling 13-week PnL TWD {worst13:,.0f}",
             f"Holdout 2025-01..2026-10: trades {len(hold)}, mean excess {hold.mean() if len(hold) else float('nan'):.4%}",
             "", "By entry year:", by_year.to_string(), "", "Checks:",
-        ] + [f"- {k}: {'PASS' if v else 'FAIL'}" for k, v in checks.items()] + [
-            "", f"OVERALL: {'PASS' if all(checks.values()) else 'FAIL'}",
+        ] + [f"- {k}: {'INCOMPLETE' if v is None else ('PASS' if v else 'FAIL')}" for k, v in checks.items()] + [
+            "", f"OVERALL: {overall}",
             "Known bias: Yahoo lacks most delisted stocks (survivorship), which likely flatters a buy-the-drop rule."]
-    open(f"{OUT_DIR}/tw_reversal_v3_summary.md", "w").write("\n".join(lines) + "\n")
+    open(f"{OUT_DIR}/tw_reversal_v3_summary.md", "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print("\n".join(lines))
 
 

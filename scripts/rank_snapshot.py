@@ -186,15 +186,16 @@ def evaluate():
                          f"{r.mean_ex_advance:.2%} | {r.mean_ex_reject:.2%} | {r.spread:+.2%} | {r.ic_routes:+.3f} | "
                          f"{r.ic_a_score:+.3f} (n {r.n_a}) |")
         m3 = log[log.horizon == "3m"]
-        n = len(m3)
+        ic = m3.ic_routes.dropna()
+        n = len(ic)
         if n >= 2:
-            t = m3.ic_routes.mean() / (m3.ic_routes.std(ddof=1) / math.sqrt(n)) if m3.ic_routes.std(ddof=1) > 0 else float("nan")
+            t = ic.mean() / (ic.std(ddof=1) / math.sqrt(n)) if ic.std(ddof=1) > 0 else float("nan")
         else:
             t = float("nan")
         verdict = "INSUFFICIENT DATA (need 12 three-month cross-sections)" if n < 12 else (
-            "screen adds value" if (m3.spread.mean() > 0 and m3.ic_routes.mean() > 0 and t >= 2) else "no evidence")
-        lines += ["", f"3-month cross-sections: {n}; mean spread {m3.spread.mean() if n else float('nan'):+.2%}; "
-                      f"mean IC {m3.ic_routes.mean() if n else float('nan'):+.3f}; IC t {t:.2f}", f"Verdict: {verdict}"]
+            "screen adds value" if (m3.spread.mean() > 0 and ic.mean() > 0 and t >= 2) else "no evidence")
+        lines += ["", f"3-month cross-sections: {len(m3)}; valid IC: {n}; mean spread {m3.spread.mean():+.2%}; "
+                      f"mean IC {ic.mean() if n else float('nan'):+.3f}; IC t {t:.2f}", f"Verdict: {verdict}"]
     else:
         lines += ["", "No evaluation yet (first 1-month read about 28 days after the first snapshot).",
                   "Verdict: INSUFFICIENT DATA"]
