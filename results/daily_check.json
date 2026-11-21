@@ -1,24 +1,71 @@
 {
-  "generated_at": "2026-11-21T12:35:28+00:00",
+  "generated_at": "2026-11-21T13:08:16+00:00",
   "price_date": "2026-11-20",
-  "alerts": [],
-  "watch": [
+  "feed_problem": null,
+  "data_problem": false,
+  "rules_total": 3,
+  "rules_evaluated": 3,
+  "checks": [
     {
       "rule": "review_line",
       "ticker": "3036",
       "instrument": "文曄",
+      "price_date": "2026-11-20",
       "price": "162.50",
       "line": "160.02",
       "avg_cost": "188.26",
       "gap_pct": "1.55",
-      "price_date": "2026-11-20"
+      "status": "NEAR"
+    },
+    {
+      "rule": "zero_fifty_ladder",
+      "ticker": "0050",
+      "step_pct": "0.3",
+      "approved_for_execution": false,
+      "price_date": "2026-11-20",
+      "price": "84.45",
+      "level": "81.62",
+      "one_year_high": "116.60",
+      "high_date": "2026-10-06",
+      "high_as_of": "2026-11-21",
+      "high_source": "TWSE STOCK_DAY",
+      "high_is_stale": false,
+      "drawdown_pct": "27.57",
+      "status": "CLEAR"
+    },
+    {
+      "rule": "zero_fifty_ladder",
+      "ticker": "0050",
+      "step_pct": "0.4",
+      "approved_for_execution": false,
+      "price_date": "2026-11-20",
+      "price": "84.45",
+      "level": "69.96",
+      "one_year_high": "116.60",
+      "high_date": "2026-10-06",
+      "high_as_of": "2026-11-21",
+      "high_source": "TWSE STOCK_DAY",
+      "high_is_stale": false,
+      "drawdown_pct": "27.57",
+      "status": "CLEAR"
     }
   ],
-  "unchecked": [
+  "triggered": [],
+  "near": [
     {
-      "ticker": "0050",
-      "reason": "還沒有實際量到的一年高點，分批加碼的價位無法計算"
-    },
+      "rule": "review_line",
+      "ticker": "3036",
+      "instrument": "文曄",
+      "price_date": "2026-11-20",
+      "price": "162.50",
+      "line": "160.02",
+      "avg_cost": "188.26",
+      "gap_pct": "1.55",
+      "status": "NEAR"
+    }
+  ],
+  "no_data": [],
+  "unpriced_positions": [
     {
       "ticker": "AVGO",
       "reason": "這個檢查只用免費的台股收盤資料，沒有美股價格"
