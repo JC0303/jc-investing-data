@@ -41,6 +41,11 @@ import time
 import numpy as np
 import pandas as pd
 
+if __name__ == "__main__":
+    from backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome, valid_price
+else:
+    from scripts.backtest_outcomes import SETTLED, WINDOW_INCOMPLETE, coverage, holding_outcome, valid_price
+
 OUT = "results"
 COST_STOCK = 0.00585
 COST_BENCH = 0.00385
@@ -130,20 +135,6 @@ def qualified_matrix(flags, cal, tickers):
     return q
 
 
-def exit_index(a, E, executable):
-    ent = a[E]
-    last = len(a) - 1
-    for d in range(1, HOLD + 1):
-        if E + d > last or not a[E + d] > 0:
-            return None, None
-        px = a[E + d]
-        if px <= ent * STOP or px >= ent * TARGET:
-            reason = "stop" if px <= ent * STOP else "target"
-            x = E + d + (1 if executable else 0)
-            return (x, reason) if x <= last and a[x] > 0 else (None, None)
-    return E + HOLD, "time"
-
-
 def simulate(cands, adj, b, cal, cap, executable):
     held_until = {}
     rows = []
@@ -160,18 +151,21 @@ def simulate(cands, adj, b, cal, cap, executable):
             if E >= len(cal):
                 continue
             a = adj[c.ticker].values
-            if not a[E] > 0:
-                continue
-            x, why = exit_index(a, E, executable)
-            if x is None:
-                continue
-            held_until[c.ticker] = x
             taken += 1
-            ret = a[x] / a[E] - 1 - COST_STOCK
-            bret = b.iloc[x] / b.iloc[E] - 1 - COST_BENCH
-            rows.append(dict(ticker=c.ticker, signal=D, r1=c.r1, gap=a[E] / a[di] - 1, entry=cal[E], exit=cal[x],
-                             days=x - E, reason=why, ret_net=ret, bench_net=bret, excess=ret - bret))
-    return pd.DataFrame(rows)
+            status, x, why = holding_outcome(a, E, HOLD, STOP, target=TARGET, next_close=executable)
+            # An unresolved path reserves the name through its latest possible exit.
+            held_until[c.ticker] = x if status in (SETTLED, WINDOW_INCOMPLETE) and x is not None else E + HOLD + int(executable)
+            ret = bret = np.nan
+            if status == SETTLED:
+                ret = a[x] / a[E] - 1 - COST_STOCK
+                bret = b.at[cal[x]] / b.at[cal[E]] - 1 - COST_BENCH
+            gap = a[E] / a[di] - 1 if valid_price(a[E]) else np.nan
+            rows.append(dict(ticker=c.ticker, signal=D, r1=c.r1, gap=gap, entry=cal[E],
+                             entry_price=a[E] if valid_price(a[E]) else np.nan,
+                             exit=cal[x] if x is not None else pd.NaT, days=x - E if x is not None else None,
+                             status=status, reason=why, ret_net=ret, bench_net=bret, excess=ret - bret))
+    return pd.DataFrame(rows, columns=["ticker", "signal", "r1", "gap", "entry", "entry_price", "exit", "days",
+                                       "status", "reason", "ret_net", "bench_net", "excess"])
 
 
 def tstat(df):
@@ -192,6 +186,8 @@ def drop_best_month(df):
 
 
 def describe(df, name):
+    name = f"{name} ({coverage(df)})"
+    df = df[df.status == SETTLED]
     if df.empty:
         return [f"{name}: no trades"]
     st = df.reason.value_counts(normalize=True)
@@ -228,6 +224,8 @@ def run(prices=None):
     d1 = simulate(cands, adj, b, cal, CAP, executable=True)
     d3 = simulate(cands, adj, b, cal, 0, executable=False)
 
+    admitted = main
+    main = admitted[admitted.status == SETTLED].copy()
     tt = tstat(main)
     checks = {
         "1 settled trades >= 100": len(main) >= 100,
@@ -236,18 +234,19 @@ def run(prices=None):
         "4 signal-date clustered t >= 2": bool(tt >= 2),
         "5 mean net excess > 0 without best calendar month": bool(drop_best_month(main) > 0),
     }
-    main["yr"] = main.signal.dt.year
+    main["yr"] = pd.to_datetime(main.signal).dt.year
     lines = ["# Short-term simulation A-track: historical check (spec v1 frozen 2026-11-13; check approved 2026-11-21)",
              f"Run (UTC): {dt.datetime.utcnow():%Y-%m-%d %H:%M}",
              f"Tickers with prices: {len(tick)}; candidate signals (no cap): {len(cands)}",
              "Approximation: ADVANCE proxy = route A revenue part only (no historical P/E; routes B/C not reproduced).",
-             "", *describe(main, "MAIN (rule as live)"),
+             "", *describe(admitted, "MAIN (rule as live)"),
              "", "By signal year (count, mean excess):", main.groupby("yr").excess.agg(["count", "mean"]).to_string(),
              "", "Pass checks:"] + [f"- {k}: {'PASS' if v else 'FAIL'}" for k, v in checks.items()]
-    lines += ["", f"OVERALL: {'PASS' if all(checks.values()) else 'FAIL'}",
+    overall = "INCOMPLETE" if main.empty or len(main) < (admitted.status != WINDOW_INCOMPLETE).sum() else ("PASS" if all(checks.values()) else "FAIL")
+    lines += ["", f"OVERALL: {overall}",
               "", "Diagnostics (not adoptable as rules):", *describe(d1, "D1 executable exit (next-day close)"),
-              *describe(main[main.r1 >= 0.095], "D2a signal-day return >= 9.5% (limit-up chase)"),
-              *describe(main[main.r1 < 0.095], "D2b signal-day return < 9.5%"),
+              *describe(admitted[admitted.r1 >= 0.095], "D2a signal-day return >= 9.5% (limit-up chase)"),
+              *describe(admitted[admitted.r1 < 0.095], "D2b signal-day return < 9.5%"),
               *describe(d3, "D3 no daily cap"),
               "", "Known bias: Yahoo lacks most delisted stocks -> optimistic."]
     with open(f"{OUT}/tw_a_track_summary.md", "w", encoding="utf-8") as f:
