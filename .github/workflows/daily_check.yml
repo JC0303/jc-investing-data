@@ -10,6 +10,10 @@ on:
   workflow_run:
     workflows: ["TW market data (DATA-03)"]
     types: [completed]
+  # Heartbeat: without it the check has no trigger of its own, so if the fetch
+  # workflow ever stops firing the check simply never runs and nothing says so.
+  schedule:
+    - cron: "23 22 * * 1-5"   # 06:23 Taipei
   workflow_dispatch: {}
 
 permissions:
@@ -29,7 +33,18 @@ jobs:
         with:
           python-version: "3.12"
 
+      # A failed or cancelled fetch leaves the previous day's data in the
+      # checkout, so the check must know its inputs may be stale rather than
+      # produce a confident report on yesterday's close.
+      - name: Note a fetch that did not succeed
+        if: >-
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.conclusion != 'success'
+        shell: bash
+        run: echo "UPSTREAM_FETCH_CONCLUSION=${{ github.event.workflow_run.conclusion }}" >> "$GITHUB_ENV"
+
       - name: Run the check
+        continue-on-error: true
         run: python scripts/daily_check.py | tee check_output.txt
 
       - name: Summary
@@ -40,6 +55,7 @@ jobs:
           cat check_output.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
       - name: Commit the result
+        if: always()
         shell: bash
         run: |
           rm -f check_output.txt
