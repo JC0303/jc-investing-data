@@ -20,6 +20,7 @@ from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+TPE = dt.timezone(dt.timedelta(hours=8))
 NEAR = Decimal('0.03')      # within 3% of a line is worth telling him about
 STALE_DAYS = 4              # a close older than this means the feed is behind
 
@@ -31,8 +32,44 @@ def roc_to_iso(value):
     return f'{int(digits[:-4]) + 1911:04d}-{digits[-4:-2]}-{digits[-2:]}'
 
 
+def feed_expectation():
+    """What the fetch job itself says the latest session should be.
+
+    Reusing its record rather than recomputing the calendar here: it already
+    distinguishes a market holiday (all four daily sources agreeing on one
+    older date) from a pipeline failure, and a second implementation of that
+    rule would drift from the first.
+    """
+    path = ROOT / 'data' / 'tw' / 'freshness.json'
+    if not path.exists():
+        return None, None, '找不到抓價的新鮮度紀錄，無法確認資料是不是最新的'
+    try:
+        record = json.loads(path.read_text(encoding='utf-8'))
+    except Exception:
+        return None, None, '抓價的新鮮度紀錄讀不開'
+    expected = record.get('expected_trading_day')
+    verdict = record.get('verdict')
+    checked = record.get('checked_taipei')
+    if checked:
+        try:
+            age = (dt.datetime.now(TPE) - dt.datetime.strptime(checked, '%Y-%m-%d %H:%M')
+                   .replace(tzinfo=TPE)).total_seconds() / 3600
+            if age > 30:
+                return expected, verdict, f'抓價工作已經 {age:.0f} 小時沒有執行（最後一次 {checked}）'
+        except ValueError:
+            pass
+    if verdict and verdict != 'OK':
+        note = record.get('note') or ''
+        if verdict == 'HOLIDAY_SUSPECT':
+            return expected, verdict, (f'四個資料源都停在同一個較早的日期。可能是台股休市，'
+                                       f'也可能是資料源同時延遲，無法從這裡分辨（{note}）')
+        return expected, verdict, f'抓價回報的狀態是 {verdict}（{note}）'
+    return expected, verdict, None
+
+
 def tw_closes():
     """Return (closes, price_date, problem). problem is None when the feed is sound."""
+    expected, verdict, feed_issue = feed_expectation()
     path = ROOT / 'data' / 'tw' / 'stock_day_all.csv'
     if not path.exists():
         return {}, None, '台股收盤檔不存在，這次完全沒有行情可用'
@@ -56,9 +93,15 @@ def tw_closes():
         return {}, day, '台股收盤檔存在但沒有任何可用的收盤價'
     if day is None:
         return closes, None, '台股收盤檔沒有可辨識的日期'
+    if feed_issue:
+        # Drop the prices: a rule must never be judged against a session that
+        # is not the one it is supposed to be judging.
+        return {}, day, feed_issue
+    if expected and day != expected:
+        return {}, day, f'台股收盤資料日期是 {day}，但預期交易日是 {expected}'
     age = (dt.date.today() - dt.date.fromisoformat(day)).days
     if age > STALE_DAYS:
-        return closes, day, f'台股收盤資料停在 {day}，已經 {age} 天沒更新'
+        return {}, day, f'台股收盤資料停在 {day}，已經 {age} 天沒更新'
     return closes, day, None
 
 

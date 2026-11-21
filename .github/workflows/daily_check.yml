@@ -3,9 +3,13 @@ name: Daily position check
 # Deterministic and free: no model, no network, no orders. Reads the holdings,
 # the approved rules and the TWSE close this repo already fetches, and writes
 # results/daily_check.json and results/daily_check.md for the reporting agent.
+# Runs when the TW fetch actually finishes, not at a guessed time. The fetch is
+# scheduled for 18:05 Taipei but has been landing at 02:25-04:06 the next
+# morning, every day, so a clock-based check read day-old data every time.
 on:
-  schedule:
-    - cron: "20 10 * * 1-5"   # 18:20 Taipei, weekdays, after the 18:05 TW fetch
+  workflow_run:
+    workflows: ["TW market data (DATA-03)"]
+    types: [completed]
   workflow_dispatch: {}
 
 permissions:
