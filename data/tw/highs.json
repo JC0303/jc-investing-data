@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-11-21T12:40:47+00:00",
+  "as_of": "2026-11-21",
+  "highs": {
+    "0050": {
+      "one_year_high": "116.60",
+      "one_year_high_date": "2026-10-06",
+      "one_year_low": "59.45",
+      "one_year_low_date": "2025-11-24",
+      "sessions_in_window": 241,
+      "window_start": "2025-11-21",
+      "window_end": "2026-11-20",
+      "source": "TWSE STOCK_DAY"
+    },
+    "009826": {
+      "one_year_high": "10.39",
+      "one_year_high_date": "2026-08-05",
+      "one_year_low": "9.59",
+      "one_year_low_date": "2026-11-20",
+      "sessions_in_window": 75,
+      "window_start": "2026-08-03",
+      "window_end": "2026-11-20",
+      "source": "TWSE STOCK_DAY"
+    },
+    "2330": {
+      "one_year_high": "2590.00",
+      "one_year_high_date": "2026-10-06",
+      "one_year_low": "1375.00",
+      "one_year_low_date": "2025-11-24",
+      "sessions_in_window": 241,
+      "window_start": "2025-11-21",
+      "window_end": "2026-11-20",
+      "source": "TWSE STOCK_DAY"
+    },
+    "3036": {
+      "one_year_high": "308.00",
+      "one_year_high_date": "2026-05-25",
+      "one_year_low": "130.00",
+      "one_year_low_date": "2025-11-21",
+      "sessions_in_window": 241,
+      "window_start": "2025-11-21",
+      "window_end": "2026-11-20",
+      "source": "TWSE STOCK_DAY"
+    }
+  },
+  "problems": [
+    {
+      "ticker": "009826",
+      "month": "2026-07",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2026-06",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2026-05",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2026-04",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2026-03",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2026-02",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2026-01",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2025-12",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2025-11",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    },
+    {
+      "ticker": "009826",
+      "month": "2025-10",
+      "error": "stat=很抱歉，沒有符合條件的資料!"
+    }
+  ]
+}
