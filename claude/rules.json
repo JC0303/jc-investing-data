@@ -1,0 +1,41 @@
+{
+  "_comment": "Machine-readable form of the rules JC has already approved. Derived from 01-Investor-Profile-and-Portfolio.md (2026-11-17) and decisions recorded in the JC Investing project. Programs read this; it never places an order.",
+  "version": 1,
+  "updated": "2026-11-21",
+  "needs_confirmation": [
+    "review_line.drop_pct: the 0.15 drop used for 3036 came from a chat on 2026-11-19 (188 cost -> 159.8 line). Confirm it should apply to every active-pool holding.",
+    "zero_fifty_ladder.high: the one-year high is recomputed from data each run; confirm the -30% / -40% steps."
+  ],
+  "monthly_dca": {
+    "ticker": "0050",
+    "amount_twd": 20000,
+    "day_of_month": 16,
+    "dividend_reinvestment": true,
+    "effective_from": "2026-11"
+  },
+  "review_line": {
+    "_comment": "An active-pool holding falling this far below its average cost triggers a review. A review is not a sell instruction.",
+    "applies_to": [
+      "3036"
+    ],
+    "drop_pct": 0.15
+  },
+  "zero_fifty_ladder": {
+    "_comment": "Extra 0050 purchases on drawdown from the one-year high. Proposed 2026-11-19, NOT yet approved for execution; the check only reports when a step is reached.",
+    "approved_for_execution": false,
+    "ticker": "0050",
+    "steps_pct_below_one_year_high": [
+      0.3,
+      0.4
+    ],
+    "one_year_high_twd": 116.5,
+    "one_year_high_as_of": "2026-11-19",
+    "one_year_high_source": "derived 2026-11-19 from a quoted price and drawdown; refresh needed - no price history is stored in this repo",
+    "one_year_high_stale_after_days": 30
+  },
+  "never": [
+    "place, modify or cancel any order",
+    "convert currency",
+    "change any broker setting"
+  ]
+}

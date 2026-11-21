@@ -1,0 +1,6 @@
+as_of,account,ticker,market,instrument,quantity,avg_cost,currency,source,confirmation
+2026-11-17,SinoPac,0050,TW,元大台灣50 ETF,1774,93.59,TWD,01-Investor-Profile-and-Portfolio.md,app screenshot
+2026-11-17,SinoPac,009826,TW,貝萊德世界股票 ETF,1500,10.04,TWD,01-Investor-Profile-and-Portfolio.md,app screenshot
+2026-11-17,SinoPac,2330,TW,台積電 (odd lot),5,2259,TWD,01-Investor-Profile-and-Portfolio.md,app screenshot
+2026-11-17,SinoPac,3036,TW,文曄,50,188.26,TWD,01-Investor-Profile-and-Portfolio.md,app screenshot
+2026-11-17,SinoPac,AVGO,US,Broadcom,1,350,USD,01-Investor-Profile-and-Portfolio.md,quantity stated by user; cost derived not shown by app
